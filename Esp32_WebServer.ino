@@ -1,4 +1,4 @@
-// CavaWiFi Version 1.7 (Migrado a ESP32 + Bluetooth Scan)
+// ESP32 WebServer Monitor v1.8 (Migrado a ESP32 + Bluetooth Scan)
 // Author Juan Maioli
 #include <WiFi.h>
 #include <WebServer.h>
@@ -24,7 +24,7 @@ String serial_number;
 String id_Esp;
 String localIP;
 String publicIP = "Obteniendo...";
-String cavaData = "Cargando...";
+String weatherData = "Cargando...";
 String wifiNetworksList = "Escaneando...";
 String bluetoothDevicesList = "Escaneando..."; // Nueva variable para BT
 String lastWifiScanTime = "Nunca";
@@ -190,18 +190,18 @@ void testDownloadSpeed() {
 void updateNetworkData() {
   Serial.println("[" + getFormattedTime() + "] [INFO] Iniciando ciclo de actualizacion...");
   
-  // 1. Datos IP y Cava
+  // 1. Datos IP y Clima
   localIP = WiFi.localIP().toString();
   getPublicIP();
   
   HTTPClient http;
   WiFiClient client;
-  if (http.begin(client, "http://pikapp.com.ar/cava/txt/")) {
+  if (http.begin(client, "http://172.21.5.3/ApiWheather/txt/")) {
     int httpCode = http.GET();
     if (httpCode > 0 && httpCode == HTTP_CODE_OK) {
       cavaData = http.getString();
     } else {
-      cavaData = "Error Cava: " + String(httpCode);
+      weatherData = "Error Clima: " + String(httpCode);
     }
     http.end();
   }
@@ -221,7 +221,7 @@ void updateNetworkData() {
 
 // --- Handler para el Servidor Web ---
 void handleRoot() {
-    String formattedCavaData = cavaData;
+    String formattedWeatherData = weatherData;
     unsigned long totalSeconds = millis() / 1000;
     unsigned long days = totalSeconds / 86400;
     unsigned long hours = (totalSeconds % 86400) / 3600;
@@ -300,7 +300,7 @@ void handleRoot() {
     // --- Slide 2: Datos del Clima ---
     page += "<div class='carousel-slide fade'>";
     page += "<h2>Datos del Clima</h2>";
-    page += "<div><p>" + formattedCavaData + "</p></div>";
+    page += "<div><p>" + formattedWeatherData + "</p></div>";
     page += "</div>";
 
     // --- Slide 3: Redes WiFi Cercanas ---

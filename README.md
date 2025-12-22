@@ -1,4 +1,4 @@
-# 📡 ESP32 WebServer Monitor (CavaWiFi v1.7)
+# 📡 ESP32 WebServer Monitor
 
 **Autor:** Juan Maioli  
 **Versión:** 1.7 (Migrado a ESP32)
@@ -58,7 +58,7 @@ Configura tu IDE con estos valores para evitar errores de memoria:
 ## 📊 Estructura del Carrusel Web
 
 1.  **Estado:** Info del sistema (Uptime, RAM, Flash, IP, MAC).
-2.  **Clima/Info:** Datos remotos de Cava.
+2.  **Clima/Info:** Datos remotos del Clima.
 3.  **WiFi:** Lista de redes ordenadas por señal.
 4.  **Bluetooth:** Lista de dispositivos BLE detectados.
 5.  **Speedtest:** Botón para iniciar prueba de velocidad.

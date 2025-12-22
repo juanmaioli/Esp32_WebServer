@@ -1,1 +1,44 @@
-.dev
+# Archivos y directorios a ignorar en proyectos ESP32/Arduino
+
+# Directorios de IDE/Herramientas
+.dev/
+.vscode/
+.idea/
+.pio/         # PlatformIO build directory
+
+# Archivos de compilación y temporales
+*.o           # Archivos objeto
+*.d           # Archivos de dependencia
+*.elf         # Ejecutable ELF
+*.bin         # Binario del firmware
+*.hex         # Archivos HEX
+*.tmp
+*.temp
+/build/       # Directorio de compilación común
+/debug/
+/release/
+
+# Archivos de datos de IDE Arduino
+*.ino.hex
+*.ino.elf
+*.ino.bin
+*-build-options.txt
+*-build-conf.txt
+*.save
+*.c.tags
+*.cpp.tags
+*.h.tags
+*.log
+*.lst
+
+# Archivos de simulación
+*.vcd
+
+# Archivos del sistema operativo
+.DS_Store
+Thumbs.db
+
+# Configuración de WiFiManager (si se guarda en SPIFFS o LittleFS y no se quiere versionar)
+# Comentar/descomentar según se necesite
+# /data/
+# /spiffs/

@@ -1,19 +1,20 @@
 # 📡 ESP32 WebServer Monitor
 
 **Autor:** Juan Maioli  
-**Versión:** 1.8 (Migrado a ESP32 + Bluetooth Scan)
+**Versión:** 1.9 (Configuración Persistente + Estilo Mejorado)
 
-Este proyecto es un monitor de sistema y red avanzado para el microcontrolador **ESP32**. Genera un servidor web local con una interfaz tipo carrusel que muestra estadísticas vitales, escaneo de redes y utilidades en tiempo real.
+Este proyecto es un monitor de sistema y red avanzado para el microcontrolador **ESP32**. Genera un servidor web local con una interfaz tipo carrusel que muestra estadísticas vitales, escaneo de redes y utilidades en tiempo real, ahora con capacidad de configuración persistente.
 
 ## ✨ Características Principales
 
-*   **🖥️ Dashboard Web Interactivo:** Accesible vía navegador (Puerto 3000), con navegación manual táctil o por botones.
+*   **🖥️ Dashboard Web Interactivo:** Accesible vía navegador (Puerto 3000), con navegación manual y diseño responsivo mejorado (Dark Mode nativo).
+*   **⚙️ Configuración Persistente:** Edita la descripción del dispositivo y el proveedor de IP pública directamente desde la web (guardado en Flash/NVS).
 *   **📶 Escáner WiFi:** Detecta redes cercanas, mostrando SSID, intensidad (RSSI) y seguridad.
 *   **🦷 Escáner Bluetooth (BLE):** Busca dispositivos Bluetooth Low Energy cercanos.
-*   **🚀 Speedtest Integrado:** Prueba de velocidad de descarga real (descarga archivo de 5MB).
-*   **🌐 Datos de Red:** Obtiene IP Pública, IP local, Gateway y Máscara de subred.
+*   **🚀 Speedtest Integrado:** Prueba de velocidad de descarga real.
+*   **🌐 Datos de Red:** Obtiene IP Pública (configurable), IP local, Gateway y Máscara de subred.
 *   **🕒 Sincronización NTP:** Hora y fecha automáticas (Zona horaria Argentina GMT-3).
-*   **🔌 Portal Cautivo (WiFiManager):** Si no encuentra red, crea un punto de acceso para configuración fácil sin tocar código.
+*   **🔌 Portal Cautivo (WiFiManager):** Si no encuentra red, crea un punto de acceso para configuración fácil.
 
 ## 🛠️ Requisitos de Hardware
 
@@ -28,6 +29,7 @@ Para compilar este proyecto, es **CRÍTICO** ajustar el esquema de partición de
 2.  **Librerías Requeridas:**
     *   `WiFiManager` (por tzapu/tablatronix).
     *   `ESP32 BLE Arduino` (Incluida en el core normalmente).
+    *   `Preferences` (Nativa del core ESP32).
     *   `HTTPClient`, `WiFiClientSecure`, `WebServer`.
 
 ### ⚠️ Parámetros de Compilación (Importante)
@@ -48,23 +50,21 @@ Configura tu IDE con estos valores para evitar errores de memoria:
 1.  **Cargar Código:** Sube el sketch `Esp32_WebServer.ino` a tu placa.
 2.  **Primera Conexión:**
     *   El ESP32 creará una red WiFi abierta llamada **`Esp32-XXXX`**.
-    *   Conéctate con tu móvil/PC.
-    *   Se abrirá el portal de configuración (o ve a `192.168.4.1`).
-    *   Selecciona tu red WiFi local e ingresa la contraseña.
+    *   Conéctate y configura tu WiFi local (Portal en `192.168.4.1`).
 3.  **Acceso al Monitor:**
-    *   Abre el Monitor Serial (115200 baudios) para ver la IP asignada.
     *   Navega a: `http://[IP-DEL-ESP32]:3000`
 
 ## 📊 Estructura del Carrusel Web
 
-1.  **Estado:** Info del sistema (Uptime, RAM, Flash, IP, MAC).
+1.  **Estado:** Info del sistema (Uptime, RAM, Flash, IP, MAC) y descripción personalizada.
 2.  **WiFi:** Lista de redes ordenadas por señal.
 3.  **Bluetooth:** Lista de dispositivos BLE detectados.
 4.  **Speedtest:** Botón para iniciar prueba de velocidad.
+5.  **Configuración:** Formulario para editar Descripción y Dominio de IP Pública.
 
 ## 🐛 Debugging
 
-El sistema envía mensajes de diagnóstico al puerto serie:
+El sistema envía mensajes de diagnóstico al puerto serie (115200 baudios):
 *   `[INFO]`: Eventos normales (conexión, escaneos).
 *   `[OK]`: Operaciones exitosas.
 *   `[CRITICO]`: Errores graves o reinicios.

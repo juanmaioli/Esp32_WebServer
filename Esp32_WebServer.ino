@@ -10,6 +10,7 @@
 #include <BLEUtils.h>
 #include <BLEScan.h>
 #include <BLEAdvertisedDevice.h>
+#include <Preferences.h>
 
 struct WifiNetwork {
   String ssid;
@@ -18,7 +19,10 @@ struct WifiNetwork {
 };
 
 // --- Variables Globales ---
-const char *host = "ifconfig.me";
+Preferences preferences;
+String config_desc = "Casa";
+String config_domain = "ifconfig.me";
+
 const char* hostname_prefix = "Esp32-";
 String serial_number;
 String id_Esp;
@@ -45,6 +49,12 @@ const long timeInterval = 60000;
 const long ipInterval = 1740000;
 
 // --- Funciones Auxiliares ---
+void loadSettings() {
+  preferences.begin("app-config", true); // Modo lectura
+  config_desc = preferences.getString("desc", "Casa");
+  config_domain = preferences.getString("domain", "ifconfig.me");
+  preferences.end();
+}
 
 String getFormattedTime() {
   time_t now = time(nullptr);
@@ -143,6 +153,8 @@ String scanBluetoothDevices() {
 void getPublicIP() {
   WiFiClientSecure client;
   client.setInsecure();
+  const char* host = config_domain.c_str();
+  
   if (!client.connect(host, 443)) return;
 
   client.print(String("GET /ip HTTP/1.1\r\n") + "Host: " + host + "\r\n" + "User-Agent: ESP32-IP-Checker\r\n" + "Connection: close\r\n\r\n");
@@ -206,6 +218,33 @@ void updateNetworkData() {
   Serial.println("[" + getFormattedTime() + "] [OK] Ciclo de actualizacion completado.");
 }
 
+void handleSaveConfig() {
+  if (server.hasArg("desc")) {
+    String d = server.arg("desc");
+    d.trim();
+    if (d.length() > 0 && d.length() <= 50) {
+      preferences.begin("app-config", false);
+      preferences.putString("desc", d);
+      preferences.end();
+      config_desc = d;
+    }
+  }
+  
+  if (server.hasArg("domain")) {
+    String dom = server.arg("domain");
+    dom.trim();
+    if (dom.length() > 0 && dom.length() <= 50) {
+      preferences.begin("app-config", false);
+      preferences.putString("domain", dom);
+      preferences.end();
+      config_domain = dom;
+    }
+  }
+
+  server.sendHeader("Location", String("/"), true);
+  server.send(302, "text/plain", "");
+}
+
 // --- Handler para el Servidor Web ---
 void handleRoot() {
     unsigned long totalSeconds = millis() / 1000;
@@ -220,137 +259,69 @@ void handleRoot() {
     uptime += String(seconds) + "s";
     if (uptime == "") uptime = "0s";
 
-    String page = "<!DOCTYPE html><html lang='es'><head>";
-    page += "<meta charset='UTF-8'>";
-    page += "<meta name='viewport' content='width=device-width, initial-scale=1.0'>";
-    page += "<meta http-equiv='refresh' content='1200'>"; 
-    page += "<link rel='icon' href='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📟</text></svg>'>";
-    page += "<title>Estado del Dispositivo (ESP32)</title>";
-    page += "<style>";
-    page += ":root { --bg-color: #f0f2f5; --container-bg: #ffffff; --text-primary: #1c1e21; --text-secondary: #4b4f56; --pre-bg: #f5f5f5; --hr-color: #e0e0e0; --dot-color: #bbb; --dot-active-color: #717171; }";
-    page += "@media (prefers-color-scheme: dark) {";
-    page += ":root { --bg-color: #121212; --container-bg: #1e1e1e; --text-primary: #e0e0e0; --text-secondary: #b0b3b8; --pre-bg: #2a2a2a; --hr-color: #3e4042; --dot-color: #555; --dot-active-color: #ccc; }";
-    page += "}";
-    page += "body { background-color: var(--bg-color); color: var(--text-secondary); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 1rem 0;}";
-    page += ".container { background-color: var(--container-bg); padding: 2rem; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); text-align: left; width: 400px; height: 80vh; position: relative; display: flex; flex-direction: column; }";
-    page += "@media (max-width: 768px) { .container { max-width: 80%; width: auto; height: 80vh; } }";
-    page += "h1, h2 { color: var(--text-primary); margin-bottom: 1rem; text-align: center; }";
-    page += "p { color: var(--text-secondary); font-size: 1.1rem; margin: 0.5rem 0; }";
-    page += "strong { color: var(--text-primary); }";
-    page += "hr { border: 0; height: 1px; background-color: var(--hr-color); margin: 1.5rem 0; }";
-    page += ".carousel-container { position: relative; flex-grow: 1; overflow: hidden; }";
-    page += ".carousel-slide { display: none; height: 100%; width: 100%; flex-basis: 100%; flex-shrink: 0; overflow-y: auto; padding-right: 15px; box-sizing: border-box; word-wrap: break-word; }";
-    page += ".fade { animation-name: fade; animation-duration: 0.5s; }";
-    page += "@keyframes fade { from {opacity: .4} to {opacity: 1} }";
-    page += ".prev, .next { cursor: pointer; position: absolute; top: 50%; transform: translateY(-50%); width: auto; padding: 16px; color: var(--text-primary); font-weight: bold; font-size: 24px; transition: 0.3s; user-select: none; z-index: 10; }";
-    page += ".prev { left: -50px; }";
-    page += ".next { right: -50px; }";
-    page += ".prev:hover, .next:hover { background-color: rgba(0,0,0,0.2); border-radius: 50%; }";
-    page += ".dots { text-align: center; padding-top: 20px; }";
-    page += ".dot { cursor: pointer; height: 15px; width: 15px; margin: 0 2px; background-color: var(--dot-color); border-radius: 50%; display: inline-block; transition: background-color 0.3s ease; }";
-    page += ".active, .dot:hover { background-color: var(--dot-active-color); }";
-    page += ".emoji-container { text-align: center; margin-top: 15px; margin-bottom: 15px; }";
-    page += ".emoji { font-size: 4em; line-height: 1; display: inline-block; vertical-align: middle; }";
-    page += ".button { background-color: #4CAF50; color: white; padding: 10px 20px; text-align: center; text-decoration: none; display: inline-block; font-size: 16px; margin: 10px 0; cursor: pointer; border-radius: 5px; }";
-    page += ".button:hover { background-color: #45a049; }";
-    page += ".button[disabled] { background-color: #555; color: #eee; border: 1px solid #eeeeee; cursor: not-allowed; }";
-    page += ".center-button { text-align: center; }";
-    page += "@media (max-width: 768px) { .container { max-width: 80%; width: auto; height: 80vh; } .prev, .next { top: auto; bottom: 5px; transform: translateY(0); } .prev { left: 10px; } .next { right: 10px; } }";
-    page += "</style></head><body><div class='container'>";
-    
-    // --- Navigation Buttons ---
-    page += "<a class='prev' onclick='changeSlide(-1)'>&#10094;</a>";
-    page += "<a class='next' onclick='changeSlide(1)'>&#10095;</a>";
+    server.setContentLength(CONTENT_LENGTH_UNKNOWN);
+    server.send(200, "text/html", "");
 
-    // --- Carousel ---
-    page += "<div class='carousel-container'>";
+    String chunk = "<!DOCTYPE html><html lang='es'><head>";
+    chunk += "<meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'>";
+    chunk += "<meta http-equiv='refresh' content='1200'>";
+    chunk += "<link rel='icon' href='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📟</text></svg>'>";
+    chunk += "<title>Estado del Dispositivo (ESP32)</title>";
+    chunk += "<style>:root { --bg-color: #f0f2f5; --container-bg: #ffffff; --text-primary: #1c1e21; --text-secondary: #4b4f56; --pre-bg: #f5f5f5; --hr-color: #e0e0e0; --dot-color: #bbb; --dot-active-color: #717171; --input-bg: #fff; --input-border: #ccc; } ";
+    chunk += "@media (prefers-color-scheme: dark) { :root { --bg-color: #121212; --container-bg: #1e1e1e; --text-primary: #e0e0e0; --text-secondary: #b0b3b8; --pre-bg: #2a2a2a; --hr-color: #3e4042; --dot-color: #555; --dot-active-color: #ccc; --input-bg: #333; --input-border: #555; } }";
+    chunk += "body { background-color: var(--bg-color); color: var(--text-secondary); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 1rem 0;}";
+    chunk += ".container { background-color: var(--container-bg); padding: 2rem; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); text-align: left; width: 400px; height: 80vh; position: relative; display: flex; flex-direction: column; } ";
+    chunk += "@media (max-width: 768px) { .container { max-width: 80%; width: auto; height: 80vh; } }";
+    chunk += "h1, h2 { color: var(--text-primary); margin-bottom: 1rem; text-align: center; } p { color: var(--text-secondary); font-size: 1.1rem; margin: 0.5rem 0; } strong { color: var(--text-primary); } hr { border: 0; height: 1px; background-color: var(--hr-color); margin: 1.5rem 0; }";
+    chunk += ".carousel-container { position: relative; flex-grow: 1; overflow: hidden; } .carousel-slide { display: none; height: 100%; width: 100%; flex-basis: 100%; flex-shrink: 0; overflow-y: auto; padding-right: 15px; box-sizing: border-box; word-wrap: break-word; }";
+    chunk += ".fade { animation-name: fade; animation-duration: 0.5s; } @keyframes fade { from {opacity: .4} to {opacity: 1} }";
+    chunk += ".prev, .next { cursor: pointer; position: absolute; top: 50%; transform: translateY(-50%); width: auto; padding: 16px; color: var(--text-primary); font-weight: bold; font-size: 24px; transition: 0.3s; user-select: none; z-index: 10; } .prev { left: -50px; } .next { right: -50px; } .prev:hover, .next:hover { background-color: rgba(0,0,0,0.2); border-radius: 50%; }";
+    chunk += ".dots { text-align: center; padding-top: 20px; } .dot { cursor: pointer; height: 15px; width: 15px; margin: 0 2px; background-color: var(--dot-color); border-radius: 50%; display: inline-block; transition: background-color 0.3s ease; } .active, .dot:hover { background-color: var(--dot-active-color); }";
+    chunk += ".emoji-container { text-align: center; margin-top: 15px; margin-bottom: 15px; } .emoji { font-size: 4em; line-height: 1; display: inline-block; vertical-align: middle; }";
+    chunk += ".button { background-color: #4CAF50; color: white; padding: 10px 20px; text-align: center; text-decoration: none; display: inline-block; font-size: 16px; margin: 10px 0; cursor: pointer; border-radius: 5px; border: none;} .button:hover { background-color: #45a049; } .button[disabled] { background-color: #555; color: #eee; border: 1px solid #eeeeee; cursor: not-allowed; }";
+    chunk += ".center-button { text-align: center; } input[type=text] { width: 100%; padding: 12px 20px; margin: 8px 0; box-sizing: border-box; border: 1px solid var(--input-border); border-radius: 4px; background-color: var(--input-bg); color: var(--text-primary); }";
+    chunk += "@media (max-width: 768px) { .container { max-width: 80%; width: auto; height: 80vh; } .prev, .next { top: auto; bottom: 5px; transform: translateY(0); } .prev { left: 10px; } .next { right: 10px; } }";
+    chunk += "</style></head><body><div class='container'>";
+    chunk += "<a class='prev' onclick='changeSlide(-1)'>&#10094;</a><a class='next' onclick='changeSlide(1)'>&#10095;</a><div class='carousel-container'>";
+    server.sendContent(chunk);
     
     // --- Slide 1: Estado del Dispositivo ---
-    page += "<div class='carousel-slide fade'>";
-    page += "<h2>Estado del Dispositivo</h2>";
-    page += "<div class='emoji-container'><span class='emoji'>📟</span></div><br>";
-    page += "<h3><strong>📅 Fecha:</strong> " + getFormattedDate() + "<br>";
-    page += "<strong>⌚ Hora:</strong> <span id='current-time'>" + getFormattedTime() + "</span><br>";
-    page += "<strong>🖥️ Hostname:</strong> " + id_Esp + "<br>";
-    page += "<strong>🏠 IP Privada:</strong> " + localIP + "<br>";
-    page += "<strong>↔️ M&aacute;scara:</strong> " + WiFi.subnetMask().toString() + "<br>";
-    page += "<strong>🚪 Gateway:</strong> " + WiFi.gatewayIP().toString() + "<br>";
-    page += "<strong>🌐 IP P&uacute;blica:</strong> " + publicIP + "<br>";
-    page += "<strong>📶 WiFi RSSI:</strong> " + String(WiFi.RSSI()) + " dBm<br>";
-    page += "<strong>🆔 MAC:</strong> " + WiFi.macAddress() + "<br>";
-    page += "<strong>💡 Chip ID:</strong> " + getUniqueId() + "<br>";
-    page += "<strong>💾 Flash:</strong> " + String(ESP.getFlashChipSize() / 1024) + " KB<br>";
-    page += "<strong>🧠 Free Heap:</strong> " + String(ESP.getFreeHeap() / 1024.0, 2) + " KB<br>";
-    page += "<strong>⚡ Uptime:</strong> " + uptime + "</h3>";
-    page += "</div>";
+    chunk = "<div class='carousel-slide fade'><h2>Estado - " + config_desc + "</h2><div class='emoji-container'><span class='emoji'>📟</span></div><br>";
+    chunk += "<h3><strong>📅 Fecha:</strong> " + getFormattedDate() + "<br>";
+    chunk += "<strong>⌚ Hora:</strong> <span id='current-time'>" + getFormattedTime() + "</span><br>";
+    chunk += "<strong>🖥️ Hostname:</strong> " + id_Esp + "<br>";
+    chunk += "<strong>🏠 IP Privada:</strong> " + localIP + "<br>";
+    chunk += "<strong>↔️ M&aacute;scara:</strong> " + WiFi.subnetMask().toString() + "<br>";
+    chunk += "<strong>🚪 Gateway:</strong> " + WiFi.gatewayIP().toString() + "<br>";
+    chunk += "<strong>🌐 IP P&uacute;blica:</strong> " + publicIP + "<br>";
+    chunk += "<strong>📶 WiFi RSSI:</strong> " + String(WiFi.RSSI()) + " dBm<br>";
+    chunk += "<strong>🆔 MAC:</strong> " + WiFi.macAddress() + "<br>";
+    chunk += "<strong>💡 Chip ID:</strong> " + getUniqueId() + "<br>";
+    chunk += "<strong>💾 Flash:</strong> " + String(ESP.getFlashChipSize() / 1024) + " KB<br>";
+    chunk += "<strong>🧠 Free Heap:</strong> " + String(ESP.getFreeHeap() / 1024.0, 2) + " KB<br>";
+    chunk += "<strong>⚡ Uptime:</strong> " + uptime + "</h3></div>";
+    server.sendContent(chunk);
 
-    // --- Slide 3: Redes WiFi Cercanas ---
-    page += "<div class='carousel-slide fade'>";
-    page += "<h2>Redes WiFi Cercanas</h2>";
-    page += "<div class='emoji-container'><span class='emoji'>📡</span></div><br>";
-    page += "<p><strong>Escaneado:</strong> " + lastWifiScanTime + "</p>";
-    page += wifiNetworksList;
-    page += "</div>";
+    // --- Slide 2: Redes WiFi Cercanas ---
+    chunk = "<div class='carousel-slide fade'><h2>Redes WiFi Cercanas</h2><div class='emoji-container'><span class='emoji'>📡</span></div><br><p><strong>Escaneado:</strong> " + lastWifiScanTime + "</p>" + wifiNetworksList + "</div>";
+    server.sendContent(chunk);
 
-    // --- Slide 4: Bluetooth (NUEVA DIAPOSITIVA) ---
-    page += "<div class='carousel-slide fade'>";
-    page += "<h2>Bluetooth (BLE)</h2>";
-    page += "<div class='emoji-container'><span class='emoji'>🦷</span></div><br>";
-    page += "<p><strong>Escaneado:</strong> " + lastBluetoothScanTime + "</p>";
-    page += bluetoothDevicesList;
-    page += "</div>";
+    // --- Slide 3: Bluetooth (BLE) ---
+    chunk = "<div class='carousel-slide fade'><h2>Bluetooth (BLE)</h2><div class='emoji-container'><span class='emoji'>🦷</span></div><br><p><strong>Escaneado:</strong> " + lastBluetoothScanTime + "</p>" + bluetoothDevicesList + "</div>";
+    server.sendContent(chunk);
 
-    // --- Slide 5: Prueba de Velocidad ---
-    page += "<div class='carousel-slide fade'>";
-    page += "<h2>Prueba de Velocidad</h2>";
-    page += "<div class='emoji-container'><span class='emoji'>🚀</span></div><br>";
-    page += "<p><strong>&Uacute;ltima prueba:</strong> " + lastSpeedTestTime + "</p>";
-    page += "<p><strong>Velocidad de Descarga:</strong> " + downloadSpeed + "</p>";
-    page += "<div class='center-button'>";
-    page += "<a href='/speedtest' id='speedtest-button' class='button' onclick='showWaiting()'>&#x1F680; Iniciar Prueba</a>";
-    page += "</div>";
-    page += "<p id='waiting-message' style='display:none; text-align:center;'>Por favor, espere mientras se realiza la prueba...</p>";
-    page += "</div>";
+    // --- Slide 4: Prueba de Velocidad ---
+    chunk = "<div class='carousel-slide fade'><h2>Prueba de Velocidad</h2><div class='emoji-container'><span class='emoji'>🚀</span></div><br><p><strong>&Uacute;ltima prueba:</strong> " + lastSpeedTestTime + "</p><p><strong>Velocidad de Descarga:</strong> " + downloadSpeed + "</p><div class='center-button'><a href='/speedtest' id='speedtest-button' class='button' onclick='showWaiting(\"speedtest-button\", \"waiting-message\")'>&#x1F680; Iniciar Prueba</a></div><p id='waiting-message' style='display:none; text-align:center;'>Por favor, espere mientras se realiza la prueba...</p></div>";
+    server.sendContent(chunk);
 
-    page += "</div>"; // end carousel-container
+    // --- Slide 5: Configuración (NUEVA) ---
+    chunk = "<div class='carousel-slide fade'><h2>Configuraci&oacute;n</h2><div class='emoji-container'><span class='emoji'>⚙️</span></div><br><form action='/save' method='POST'><p><strong>Descripci&oacute;n del Dispositivo:</strong><br><input type='text' name='desc' value='" + config_desc + "' maxlength='50' placeholder='Ej: Casa'></p><p><strong>Dominio IP P&uacute;blica:</strong><br><input type='text' name='domain' value='" + config_domain + "' maxlength='50' placeholder='Ej: ifconfig.me'></p><div class='center-button'><button type='submit' class='button'>💾 Guardar Cambios</button></div></form></div>";
+    server.sendContent(chunk);
 
-    // --- Dots ---
-    page += "<div class='dots'>";
-    page += "<span class='dot' onclick='currentSlide(1)'></span>";
-    page += "<span class='dot' onclick='currentSlide(2)'></span>";
-    page += "<span class='dot' onclick='currentSlide(3)'></span>";
-    page += "<span class='dot' onclick='currentSlide(4)'></span>";
-    page += "</div>";
+    chunk = "</div><div class='dots'><span class='dot' onclick='currentSlide(1)'></span><span class='dot' onclick='currentSlide(2)'></span><span class='dot' onclick='currentSlide(3)'></span><span class='dot' onclick='currentSlide(4)'></span><span class='dot' onclick='currentSlide(5)'></span></div></div>";
+    chunk += "<script>let slideIndex=1;showSlide(slideIndex);function changeSlide(n){showSlide(slideIndex+=n)}function currentSlide(n){showSlide(slideIndex=n)}function showWaiting(b,m){document.getElementById(b).setAttribute('disabled','true');document.getElementById(b).innerHTML='⏳ Trabajando...';document.getElementById(m).style.display='block'}function showSlide(n){let i;let s=document.getElementsByClassName('carousel-slide');let d=document.getElementsByClassName('dot');if(n>s.length){slideIndex=1}if(n<1){slideIndex=s.length}for(i=0;i<s.length;i++){s[i].style.display='none'}for(i=0;i<d.length;i++){d[i].className=d[i].className.replace(' active','')}s[slideIndex-1].style.display='block';d[slideIndex-1].className+=' active'}function updateTime(){fetch('/time').then(r=>r.text()).then(d=>{if(d)document.getElementById('current-time').innerText=d})}setInterval(updateTime,900000);</script></body></html>";
+    server.sendContent(chunk);
 
-    page += "</div>"; // end container
-
-    // --- JavaScript ---
-    page += "<script>";
-    page += "let slideIndex = 1;";
-    page += "showSlide(slideIndex);";
-    page += "function changeSlide(n) { showSlide(slideIndex += n); }";
-    page += "function currentSlide(n) { showSlide(slideIndex = n); }";
-    page += "function showWaiting() {";
-    page += "  document.getElementById('speedtest-button').setAttribute('disabled', 'true');";
-    page += "  document.getElementById('speedtest-button').innerHTML = '⏳ Midiendo...';";
-    page += "  document.getElementById('waiting-message').style.display = 'block';";
-    page += "}";
-    page += "function showSlide(n) {";
-    page += "let i; let slides = document.getElementsByClassName('carousel-slide');";
-    page += "let dots = document.getElementsByClassName('dot');";
-    page += "if (n > slides.length) { slideIndex = 1; }";
-    page += "if (n < 1) { slideIndex = slides.length; }";
-    page += "for (i = 0; i < slides.length; i++) { slides[i].style.display = 'none'; }";
-    page += "for (i = 0; i < dots.length; i++) { dots[i].className = dots[i].className.replace(' active', ''); }";
-    page += "slides[slideIndex - 1].style.display = 'block';";
-    page += "dots[slideIndex - 1].className += ' active';";
-    page += "}";
-    page += "function updateTime() { fetch('/time').then(response => response.text()).then(data => { if (data) document.getElementById('current-time').innerText = data; }); } setInterval(updateTime, 900000);";
-    page += "</script>";
-    
-    page += "</body></html>";
-
-    server.send(200, "text/html", page);
 }
 
 void handleSpeedTest() {
@@ -371,6 +342,9 @@ void setup() {
     Serial.println("\n\n====================================");
     Serial.println("   Iniciando WebServer ESP32 + BT   ");
     Serial.println("====================================");
+
+    // Cargar Configuración
+    loadSettings();
 
     // Inicializar BLE
     BLEDevice::init("");
@@ -410,6 +384,7 @@ void setup() {
     server.on("/", handleRoot);
     server.on("/speedtest", handleSpeedTest);
     server.on("/time", handleTimeRequest);
+    server.on("/save", HTTP_POST, handleSaveConfig);
     server.begin();
 
     Serial.println("------------------------------------");

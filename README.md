@@ -1,20 +1,20 @@
 # 📡 ESP32 WebServer Monitor (FreeRTOS Dual-Core)
 
 **Autor:** Juan Maioli  
-**Versión:** 2.0 (Multitarea Real + Configuración Persistente)
+**Versión:** 2.1 (Optimizado para Rendimiento y Memoria)
 
 Este proyecto es un monitor de sistema y red avanzado para el microcontrolador **ESP32**. Genera un servidor web local con una interfaz fluida tipo carrusel que muestra estadísticas vitales, escaneo de redes y utilidades en tiempo real.
 
-> **🚀 Novedad v2.0:** Utiliza **FreeRTOS** para ejecutar escaneos de WiFi y Bluetooth en un núcleo secundario (Core 0), manteniendo el servidor web siempre receptivo en el núcleo principal (Core 1). ¡Cero bloqueos!
+> **🚀 Novedad v2.1:** Optimizaciones críticas de memoria (PROGMEM) y velocidad de red (Buffer 4KB), además de la arquitectura Dual-Core.
 
 ## ✨ Características Principales
 
 *   **🖥️ Dashboard Web Fluido:** Accesible vía navegador (Puerto 3000), con navegación manual y diseño responsivo (Dark Mode).
-*   **⚡ Arquitectura Dual-Core:** Las tareas pesadas (escaneos) corren en segundo plano sin congelar la interfaz web.
+*   **⚡ Arquitectura Dual-Core:** Las tareas pesadas (escaneos) corren en segundo plano (Core 0) sin congelar la interfaz web (Core 1).
 *   **⚙️ Configuración Persistente:** Edita la descripción del dispositivo y el proveedor de IP pública desde la web (guardado en Flash/NVS).
 *   **📶 Escáner WiFi:** Detecta redes cercanas, mostrando SSID, intensidad (RSSI) y seguridad.
 *   **🦷 Escáner Bluetooth (BLE):** Busca dispositivos Bluetooth Low Energy cercanos.
-*   **🚀 Speedtest Integrado:** Prueba de velocidad de descarga real.
+*   **🚀 Speedtest Integrado:** Prueba de velocidad de descarga real optimizada con buffers de alto rendimiento.
 *   **🌐 Datos de Red:** Obtiene IP Pública (configurable), IP local, Gateway y Máscara de subred.
 *   **🕒 Sincronización NTP:** Hora y fecha automáticas (Zona horaria Argentina GMT-3).
 *   **🔌 Portal Cautivo (WiFiManager):** Si no encuentra red, crea un punto de acceso para configuración fácil.

@@ -42,6 +42,32 @@ String lastSpeedTestTime = "Nunca";
 WebServer server(3000);
 BLEScan* pBLEScan; // Puntero para el escáner BLE
 
+// --- Contenido Web Estático (PROGMEM) ---
+const char INDEX_HTML_HEAD[] PROGMEM = R"rawliteral(
+<!DOCTYPE html><html lang='es'><head>
+<meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'>
+<meta http-equiv='refresh' content='1200'>
+<link rel='icon' href='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📟</text></svg>'>
+<title>Estado del Dispositivo (ESP32)</title>
+<style>
+:root { --bg-color: #f0f2f5; --container-bg: #ffffff; --text-primary: #1c1e21; --text-secondary: #4b4f56; --pre-bg: #f5f5f5; --hr-color: #e0e0e0; --dot-color: #bbb; --dot-active-color: #717171; --input-bg: #fff; --input-border: #ccc; }
+@media (prefers-color-scheme: dark) { :root { --bg-color: #121212; --container-bg: #1e1e1e; --text-primary: #e0e0e0; --text-secondary: #b0b3b8; --pre-bg: #2a2a2a; --hr-color: #3e4042; --dot-color: #555; --dot-active-color: #ccc; --input-bg: #333; --input-border: #555; } }
+body { background-color: var(--bg-color); color: var(--text-secondary); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 1rem 0;}
+.container { background-color: var(--container-bg); padding: 2rem; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); text-align: left; width: 400px; height: 80vh; position: relative; display: flex; flex-direction: column; }
+@media (max-width: 768px) { .container { max-width: 80%; width: auto; height: 80vh; } }
+h1, h2 { color: var(--text-primary); margin-bottom: 1rem; text-align: center; } p { color: var(--text-secondary); font-size: 1.1rem; margin: 0.5rem 0; } strong { color: var(--text-primary); } hr { border: 0; height: 1px; background-color: var(--hr-color); margin: 1.5rem 0; }
+.carousel-container { position: relative; flex-grow: 1; overflow: hidden; } .carousel-slide { display: none; height: 100%; width: 100%; flex-basis: 100%; flex-shrink: 0; overflow-y: auto; padding-right: 15px; box-sizing: border-box; word-wrap: break-word; }
+.fade { animation-name: fade; animation-duration: 0.5s; } @keyframes fade { from {opacity: .4} to {opacity: 1} }
+.prev, .next { cursor: pointer; position: absolute; top: 50%; transform: translateY(-50%); width: auto; padding: 16px; color: var(--text-primary); font-weight: bold; font-size: 24px; transition: 0.3s; user-select: none; z-index: 10; } .prev { left: -50px; } .next { right: -50px; } .prev:hover, .next:hover { background-color: rgba(0,0,0,0.2); border-radius: 50%; }
+.dots { text-align: center; padding-top: 20px; } .dot { cursor: pointer; height: 15px; width: 15px; margin: 0 2px; background-color: var(--dot-color); border-radius: 50%; display: inline-block; transition: background-color 0.3s ease; } .active, .dot:hover { background-color: var(--dot-active-color); }
+.emoji-container { text-align: center; margin-top: 15px; margin-bottom: 15px; } .emoji { font-size: 4em; line-height: 1; display: inline-block; vertical-align: middle; }
+.button { background-color: #4CAF50; color: white; padding: 10px 20px; text-align: center; text-decoration: none; display: inline-block; font-size: 16px; margin: 10px 0; cursor: pointer; border-radius: 5px; border: none;} .button:hover { background-color: #45a049; } .button[disabled] { background-color: #555; color: #eee; border: 1px solid #eeeeee; cursor: not-allowed; }
+.center-button { text-align: center; } input[type=text] { width: 100%; padding: 12px 20px; margin: 8px 0; box-sizing: border-box; border: 1px solid var(--input-border); border-radius: 4px; background-color: var(--input-bg); color: var(--text-primary); }
+@media (max-width: 768px) { .container { max-width: 80%; width: auto; height: 80vh; } .prev, .next { top: auto; bottom: 5px; transform: translateY(0); } .prev { left: 10px; } .next { right: 10px; } }
+</style></head><body><div class='container'>
+<a class='prev' onclick='changeSlide(-1)'>&#10094;</a><a class='next' onclick='changeSlide(1)'>&#10095;</a><div class='carousel-container'>
+)rawliteral";
+
 const char *ntpServer = "pool.ntp.org";
 const long gmtOffset_sec = -3 * 3600;
 const int daylightOffset_sec = 0;
@@ -181,7 +207,7 @@ void testDownloadSpeed() {
     int httpCode = http.GET();
     if (httpCode > 0 && httpCode == HTTP_CODE_OK) {
       int len = http.getSize();
-      uint8_t buff[128] = { 0 };
+      uint8_t buff[4096] = { 0 };
       while (http.connected() && (len > 0 || len == -1)) {
         size_t size = client.readBytes(buff, sizeof(buff));
         if (size == 0) break;
@@ -348,89 +374,103 @@ void handleRoot() {
 
 
 
-    server.setContentLength(CONTENT_LENGTH_UNKNOWN);
-
-    server.send(200, "text/html", "");
+        server.setContentLength(CONTENT_LENGTH_UNKNOWN);
 
 
 
-    String chunk = "<!DOCTYPE html><html lang='es'><head>";
+        server.send(200, "text/html", "");
 
-    chunk += "<meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'>";
 
-    chunk += "<meta http-equiv='refresh' content='1200'>";
-
-    chunk += "<link rel='icon' href='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📟</text></svg>'>";
-
-    chunk += "<title>Estado del Dispositivo (ESP32)</title>";
-
-    chunk += "<style>:root { --bg-color: #f0f2f5; --container-bg: #ffffff; --text-primary: #1c1e21; --text-secondary: #4b4f56; --pre-bg: #f5f5f5; --hr-color: #e0e0e0; --dot-color: #bbb; --dot-active-color: #717171; --input-bg: #fff; --input-border: #ccc; } ";
-
-    chunk += "@media (prefers-color-scheme: dark) { :root { --bg-color: #121212; --container-bg: #1e1e1e; --text-primary: #e0e0e0; --text-secondary: #b0b3b8; --pre-bg: #2a2a2a; --hr-color: #3e4042; --dot-color: #555; --dot-active-color: #ccc; --input-bg: #333; --input-border: #555; } }";
-
-    chunk += "body { background-color: var(--bg-color); color: var(--text-secondary); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 1rem 0;}";
-
-    chunk += ".container { background-color: var(--container-bg); padding: 2rem; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); text-align: left; width: 400px; height: 80vh; position: relative; display: flex; flex-direction: column; } ";
-
-    chunk += "@media (max-width: 768px) { .container { max-width: 80%; width: auto; height: 80vh; } }";
-
-    chunk += "h1, h2 { color: var(--text-primary); margin-bottom: 1rem; text-align: center; } p { color: var(--text-secondary); font-size: 1.1rem; margin: 0.5rem 0; } strong { color: var(--text-primary); } hr { border: 0; height: 1px; background-color: var(--hr-color); margin: 1.5rem 0; }";
-
-    chunk += ".carousel-container { position: relative; flex-grow: 1; overflow: hidden; } .carousel-slide { display: none; height: 100%; width: 100%; flex-basis: 100%; flex-shrink: 0; overflow-y: auto; padding-right: 15px; box-sizing: border-box; word-wrap: break-word; }";
-
-    chunk += ".fade { animation-name: fade; animation-duration: 0.5s; } @keyframes fade { from {opacity: .4} to {opacity: 1} }";
-
-    chunk += ".prev, .next { cursor: pointer; position: absolute; top: 50%; transform: translateY(-50%); width: auto; padding: 16px; color: var(--text-primary); font-weight: bold; font-size: 24px; transition: 0.3s; user-select: none; z-index: 10; } .prev { left: -50px; } .next { right: -50px; } .prev:hover, .next:hover { background-color: rgba(0,0,0,0.2); border-radius: 50%; }";
-
-    chunk += ".dots { text-align: center; padding-top: 20px; } .dot { cursor: pointer; height: 15px; width: 15px; margin: 0 2px; background-color: var(--dot-color); border-radius: 50%; display: inline-block; transition: background-color 0.3s ease; } .active, .dot:hover { background-color: var(--dot-active-color); }";
-
-    chunk += ".emoji-container { text-align: center; margin-top: 15px; margin-bottom: 15px; } .emoji { font-size: 4em; line-height: 1; display: inline-block; vertical-align: middle; }";
-
-    chunk += ".button { background-color: #4CAF50; color: white; padding: 10px 20px; text-align: center; text-decoration: none; display: inline-block; font-size: 16px; margin: 10px 0; cursor: pointer; border-radius: 5px; border: none;} .button:hover { background-color: #45a049; } .button[disabled] { background-color: #555; color: #eee; border: 1px solid #eeeeee; cursor: not-allowed; }";
-
-    chunk += ".center-button { text-align: center; } input[type=text] { width: 100%; padding: 12px 20px; margin: 8px 0; box-sizing: border-box; border: 1px solid var(--input-border); border-radius: 4px; background-color: var(--input-bg); color: var(--text-primary); }";
-
-    chunk += "@media (max-width: 768px) { .container { max-width: 80%; width: auto; height: 80vh; } .prev, .next { top: auto; bottom: 5px; transform: translateY(0); } .prev { left: 10px; } .next { right: 10px; } }";
-
-    chunk += "</style></head><body><div class='container'>";
-
-    chunk += "<a class='prev' onclick='changeSlide(-1)'>&#10094;</a><a class='next' onclick='changeSlide(1)'>&#10095;</a><div class='carousel-container'>";
-
-    server.sendContent(chunk);
 
     
 
-    // --- Slide 1: Estado del Dispositivo ---
 
-    chunk = "<div class='carousel-slide fade'><h2>Estado - " + config_desc + "</h2><div class='emoji-container'><span class='emoji'>📟</span></div><br>";
 
-    chunk += "<h3><strong>📅 Fecha:</strong> " + getFormattedDate() + "<br>";
+        // Enviar cabecera estática desde Flash (PROGMEM)
 
-    chunk += "<strong>⌚ Hora:</strong> <span id='current-time'>" + getFormattedTime() + "</span><br>";
 
-    chunk += "<strong>🖥️ Hostname:</strong> " + id_Esp + "<br>";
 
-    chunk += "<strong>🏠 IP Privada:</strong> " + _locIP + "<br>";
+        server.sendContent_P(INDEX_HTML_HEAD);
 
-    chunk += "<strong>↔️ M&aacute;scara:</strong> " + _mask + "<br>";
 
-    chunk += "<strong>🚪 Gateway:</strong> " + _gw + "<br>";
 
-    chunk += "<strong>🌐 IP P&uacute;blica:</strong> " + _pubIP + "<br>";
+    
 
-    chunk += "<strong>📶 WiFi RSSI:</strong> " + _rssi + " dBm<br>";
 
-    chunk += "<strong>🆔 MAC:</strong> " + _mac + "<br>";
 
-    chunk += "<strong>💡 Chip ID:</strong> " + getUniqueId() + "<br>";
+        String chunk;
 
-    chunk += "<strong>💾 Flash:</strong> " + String(ESP.getFlashChipSize() / 1024) + " KB<br>";
 
-    chunk += "<strong>🧠 Free Heap:</strong> " + String(ESP.getFreeHeap() / 1024.0, 2) + " KB<br>";
 
-    chunk += "<strong>⚡ Uptime:</strong> " + _uptime + "</h3></div>";
+        chunk.reserve(2048); // Pre-reservar memoria para evitar fragmentación
 
-    server.sendContent(chunk);
+
+
+        
+
+
+
+        // --- Slide 1: Estado del Dispositivo ---
+
+
+
+        chunk = "<div class='carousel-slide fade'><h2>Estado - " + config_desc + "</h2><div class='emoji-container'><span class='emoji'>📟</span></div><br>";
+
+
+
+        chunk += "<h3><strong>📅 Fecha:</strong> " + getFormattedDate() + "<br>";
+
+
+
+        chunk += "<strong>⌚ Hora:</strong> <span id='current-time'>" + getFormattedTime() + "</span><br>";
+
+
+
+        chunk += "<strong>🖥️ Hostname:</strong> " + id_Esp + "<br>";
+
+
+
+        chunk += "<strong>🏠 IP Privada:</strong> " + _locIP + "<br>";
+
+
+
+        chunk += "<strong>↔️ M&aacute;scara:</strong> " + _mask + "<br>";
+
+
+
+        chunk += "<strong>🚪 Gateway:</strong> " + _gw + "<br>";
+
+
+
+        chunk += "<strong>🌐 IP P&uacute;blica:</strong> " + _pubIP + "<br>";
+
+
+
+        chunk += "<strong>📶 WiFi RSSI:</strong> " + _rssi + " dBm<br>";
+
+
+
+        chunk += "<strong>🆔 MAC:</strong> " + _mac + "<br>";
+
+
+
+        chunk += "<strong>💡 Chip ID:</strong> " + getUniqueId() + "<br>";
+
+
+
+        chunk += "<strong>💾 Flash:</strong> " + String(ESP.getFlashChipSize() / 1024) + " KB<br>";
+
+
+
+        chunk += "<strong>🧠 Free Heap:</strong> " + String(ESP.getFreeHeap() / 1024.0, 2) + " KB<br>";
+
+
+
+        chunk += "<strong>⚡ Uptime:</strong> " + _uptime + "</h3></div>";
+
+
+
+        server.sendContent(chunk);
 
 
 

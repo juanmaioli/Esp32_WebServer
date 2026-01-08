@@ -77,8 +77,10 @@ const int daylightOffset_sec = 0;
 
 unsigned long previousTimeUpdate = 0;
 unsigned long previousIpUpdate = 0;
+unsigned long previousWifiUpdate = 0; // Nueva variable para rastrear el escaneo automático
 const long timeInterval = 60000;      
 const long ipInterval = 1740000;
+const long wifiInterval = 300000;     // Escaneo automático cada 5 minutos (300s)
 
 // --- Funciones Auxiliares ---
 void loadSettings() {
@@ -269,18 +271,19 @@ void networkTask(void * parameter) {
       }
     }
 
-    // --- 2. Escaneo WiFi Manual ---
-    if (requestWifiScan) {
-      Serial.println("[" + getFormattedTime() + "] [BG-TASK] Ejecutando Escaneo WiFi Manual...");
+    // --- 2. Escaneo WiFi (Automático y Manual) ---
+    if (requestWifiScan || (currentMillis - previousWifiUpdate >= wifiInterval || previousWifiUpdate == 0)) {
+      Serial.println("[" + getFormattedTime() + "] [BG-TASK] Ejecutando Escaneo WiFi...");
       String tempWifiList = scanWifiNetworks();
       String tempWifiTime = getFormattedTime();
       
       if (xSemaphoreTake(dataMutex, portMAX_DELAY)) {
         wifiNetworksList = tempWifiList;
         lastWifiScanTime = tempWifiTime;
+        previousWifiUpdate = currentMillis; // Actualizar timer automático
         xSemaphoreGive(dataMutex);
       }
-      requestWifiScan = false; // Reset flag
+      requestWifiScan = false; // Reset flag manual
       Serial.println("[" + getFormattedTime() + "] [BG-TASK] Escaneo WiFi Completado.");
     }
 
@@ -582,8 +585,8 @@ void handleTimeRequest() {
 // --- Setup y Loop ---
 
 void setup() {
-    delay(1000);
     Serial.begin(115200);
+    delay(1000);
     Serial.println("\n\n====================================");
     Serial.println("   Iniciando WebServer ESP32 + BT   ");
     Serial.println("====================================");

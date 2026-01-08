@@ -1,17 +1,17 @@
 # 📡 ESP32 WebServer Monitor (FreeRTOS Dual-Core)
 
 **Autor:** Juan Maioli  
-**Versión:** 2.2 (Escaneos Manuales + Hostname Robust)
+**Versión:** 2.3 (WiFi Automático + Bluetooth Manual)
 
 Este proyecto es un monitor de sistema y red avanzado para el microcontrolador **ESP32**. Genera un servidor web local con una interfaz fluida tipo carrusel que muestra estadísticas vitales, escaneo de redes y utilidades en tiempo real.
 
-> **🚀 Novedad v2.2:** Se han implementado escaneos manuales para WiFi y Bluetooth, eliminando procesos automáticos innecesarios y mejorando la estabilidad del Hostname mediante detección de hardware (ChipID).
+> **🚀 Novedad v2.3:** El escaneo de WiFi vuelve a ser automático (cada 5 minutos) en segundo plano, manteniendo el escaneo de Bluetooth de forma manual para optimizar recursos.
 
 ## ✨ Características Principales
 
 *   **🖥️ Dashboard Web Fluido:** Accesible vía navegador (Puerto 3000), con navegación manual y diseño responsivo (Dark Mode).
-*   **⚡ Arquitectura Dual-Core:** Las tareas pesadas (escaneos manuales e IP) corren en segundo plano (Core 0) sin congelar la interfaz web (Core 1).
-*   **🔍 Escaneos Bajo Demanda:** Botones dedicados para iniciar escaneos de WiFi y Bluetooth solo cuando el usuario lo requiera.
+*   **⚡ Arquitectura Dual-Core:** Las tareas pesadas (escaneos e IP) corren en segundo plano (Core 0) sin congelar la interfaz web (Core 1).
+*   **🔍 Escaneos Inteligentes:** WiFi se actualiza automáticamente cada 5 minutos; Bluetooth se activa solo bajo demanda manual.
 *   **🆔 Hostname Inteligente:** Generación robusta del nombre de red basada en la MAC o el ChipID único del hardware.
 *   **⚙️ Configuración Persistente:** Edita la descripción del dispositivo y el proveedor de IP pública desde la web (guardado en Flash/NVS).
 *   **📶 Escáner WiFi:** Detecta redes cercanas, mostrando SSID, intensidad (RSSI) y seguridad.
@@ -61,7 +61,7 @@ Configura tu IDE con estos valores para evitar errores de memoria:
 ## 📊 Estructura del Carrusel Web
 
 1.  **Estado:** Info del sistema (Uptime, RAM, Flash, IP, MAC) y descripción personalizada.
-2.  **WiFi:** Lista de redes con botón de escaneo manual.
+2.  **WiFi:** Lista de redes con actualización automática y botón manual.
 3.  **Bluetooth:** Lista de dispositivos BLE con botón de escaneo manual.
 4.  **Speedtest:** Botón para iniciar prueba de velocidad.
 5.  **Configuración:** Formulario para editar Descripción y Dominio de IP Pública.

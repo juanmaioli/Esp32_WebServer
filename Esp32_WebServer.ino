@@ -224,6 +224,7 @@ void handleRoot() {
     page += "<meta charset='UTF-8'>";
     page += "<meta name='viewport' content='width=device-width, initial-scale=1.0'>";
     page += "<meta http-equiv='refresh' content='1200'>"; 
+    page += "<link rel='icon' href='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📟</text></svg>'>";
     page += "<title>Estado del Dispositivo (ESP32)</title>";
     page += "<style>";
     page += ":root { --bg-color: #f0f2f5; --container-bg: #ffffff; --text-primary: #1c1e21; --text-secondary: #4b4f56; --pre-bg: #f5f5f5; --hr-color: #e0e0e0; --dot-color: #bbb; --dot-active-color: #717171; }";

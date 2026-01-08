@@ -1,23 +1,24 @@
 # 📡 ESP32 WebServer Monitor (FreeRTOS Dual-Core)
 
 **Autor:** Juan Maioli  
-**Versión:** 2.3 (WiFi Automático + Bluetooth Manual)
+**Versión:** 2.4 (Estabilidad Mejorada + Caché de IP)
 
 Este proyecto es un monitor de sistema y red avanzado para el microcontrolador **ESP32**. Genera un servidor web local con una interfaz fluida tipo carrusel que muestra estadísticas vitales, escaneo de redes y utilidades en tiempo real.
 
-> **🚀 Novedad v2.3:** El escaneo de WiFi vuelve a ser automático (cada 5 minutos) en segundo plano, manteniendo el escaneo de Bluetooth de forma manual para optimizar recursos.
+> **🚀 Novedad v2.4:** Se ha optimizado la gestión de recursos mediante el uso de semáforos (Mutex) con timeout, caché de IP local para reducir la carga de CPU y mejoras en la estabilidad de las tareas de fondo para prevenir bloqueos.
 
 ## ✨ Características Principales
 
 *   **🖥️ Dashboard Web Fluido:** Accesible vía navegador (Puerto 3000), con navegación manual y diseño responsivo (Dark Mode).
 *   **⚡ Arquitectura Dual-Core:** Las tareas pesadas (escaneos e IP) corren en segundo plano (Core 0) sin congelar la interfaz web (Core 1).
-*   **🔍 Escaneos Inteligentes:** WiFi se actualiza automáticamente cada 5 minutos; Bluetooth se activa solo bajo demanda manual.
+*   **🔍 Gestión Inteligente de Escaneos:** WiFi automático (cada 5 min) y Bluetooth manual, optimizados para no saturar el procesador.
+*   **🛡️ Alta Estabilidad:** Implementación de FreeRTOS con Mutex optimizados y gestión de tiempos de espera para evitar disparos del Watchdog.
 *   **🆔 Hostname Inteligente:** Generación robusta del nombre de red basada en la MAC o el ChipID único del hardware.
 *   **⚙️ Configuración Persistente:** Edita la descripción del dispositivo y el proveedor de IP pública desde la web (guardado en Flash/NVS).
 *   **📶 Escáner WiFi:** Detecta redes cercanas, mostrando SSID, intensidad (RSSI) y seguridad.
 *   **🦷 Escáner Bluetooth (BLE):** Busca dispositivos Bluetooth Low Energy cercanos.
 *   **🚀 Speedtest Integrado:** Prueba de velocidad de descarga real optimizada con buffers de alto rendimiento.
-*   **🌐 Datos de Red:** Obtiene IP Pública (configurable), IP local, Gateway y Máscara de subred.
+*   **🌐 Datos de Red:** Obtiene IP Pública (configurable), IP local cacheada, Gateway y Máscara de subred.
 *   **🕒 Sincronización NTP:** Hora y fecha automáticas (Zona horaria Argentina GMT-3).
 *   **🔌 Portal Cautivo (WiFiManager):** Si no encuentra red, crea un punto de acceso para configuración fácil.
 
@@ -34,7 +35,7 @@ Para compilar este proyecto, es **CRÍTICO** ajustar el esquema de partición de
 2.  **Librerías Requeridas:**
     *   `WiFiManager` (por tzapu/tablatronix).
     *   `ESP32 BLE Arduino`, `Preferences`, `FreeRTOS` (Nativas del core ESP32).
-    *   `HTTPClient`, `WiFiClientSecure`, `WebServer`.
+    *   `HTTPClient`, `NetworkClientSecure`, `WebServer`.
 
 ### ⚠️ Parámetros de Compilación (Importante)
 

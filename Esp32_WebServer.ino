@@ -167,8 +167,8 @@ String scanWifiNetworks() {
 }
 
 String scanBluetoothDevices() {
-  // Escaneo de 5 segundos - start devuelve un puntero
-  BLEScanResults *foundDevices = pBLEScan->start(5, false);
+  // Escaneo de 3 segundos - start devuelve un puntero
+  BLEScanResults *foundDevices = pBLEScan->start(3, false);
   int count = foundDevices->getCount();
   String list = "";
   
@@ -244,13 +244,12 @@ void networkTask(void * parameter) {
   for (;;) {
     unsigned long currentMillis = millis();
     
-    // --- 1. Tareas Periódicas (Solo IP) ---
+    // --- 1. Tareas Periódicas (Solo IP Pública) ---
     if (currentMillis - previousIpUpdate >= ipInterval || previousIpUpdate == 0) {
-      Serial.println("[" + getFormattedTime() + "] [BG-TASK] Actualizando IP...");
+      Serial.println("[" + getFormattedTime() + "] [BG-TASK] Actualizando IP Publica...");
       
-      String tempLocalIP = WiFi.localIP().toString();
       String tempPublicIP = "Error";
-      WiFiClientSecure client;
+      NetworkClientSecure client;
       client.setInsecure();
       const char* host = config_domain.c_str(); 
       if (client.connect(host, 443)) {
@@ -262,9 +261,12 @@ void networkTask(void * parameter) {
         }
       }
 
+      // También verificamos si la IP local cambió (por si hubo reconexión silenciosa)
+      String tempLocalIP = WiFi.localIP().toString();
+
       if (xSemaphoreTake(dataMutex, portMAX_DELAY)) {
-        localIP = tempLocalIP;
         publicIP = tempPublicIP;
+        localIP = tempLocalIP; // Actualizar caché
         previousIpUpdate = currentMillis;
         xSemaphoreGive(dataMutex);
       }
@@ -276,6 +278,8 @@ void networkTask(void * parameter) {
       String tempWifiList = scanWifiNetworks();
       String tempWifiTime = getFormattedTime();
       
+      vTaskDelay(pdMS_TO_TICKS(50)); // Pequeño respiro para el sistema
+
       if (xSemaphoreTake(dataMutex, portMAX_DELAY)) {
         wifiNetworksList = tempWifiList;
         lastWifiScanTime = tempWifiTime;
@@ -286,12 +290,16 @@ void networkTask(void * parameter) {
       Serial.println("[" + getFormattedTime() + "] [BG-TASK] Escaneo WiFi Completado.");
     }
 
+    vTaskDelay(pdMS_TO_TICKS(100)); // Ceder tiempo entre tareas
+
     // --- 3. Escaneo Bluetooth Manual ---
     if (requestBleScan) {
       Serial.println("[" + getFormattedTime() + "] [BG-TASK] Ejecutando Escaneo Bluetooth Manual...");
       String tempBleList = scanBluetoothDevices();
       String tempBleTime = getFormattedTime();
       
+      vTaskDelay(pdMS_TO_TICKS(50)); // Pequeño respiro para el sistema
+
       if (xSemaphoreTake(dataMutex, portMAX_DELAY)) {
         bluetoothDevicesList = tempBleList;
         lastBluetoothScanTime = tempBleTime;
@@ -356,166 +364,69 @@ void handleScanBle() {
 // --- Handler para el Servidor Web ---
 
 void handleRoot() {
-
-    // 1. Copia de seguridad de datos (Sección Crítica)
-
-    String _uptime, _wifiList, _bleList, _pubIP, _locIP, _gw, _mask, _rssi, _mac, _wScanTime, _bScanTime, _spdTime, _spdVal;
-
+    // Captura rápida de datos dinámicos (Sección Crítica mínima)
+    String _wifiList, _bleList, _pubIP, _locIP, _wScanTime, _bScanTime, _spdTime, _spdVal;
     
-
-    if (xSemaphoreTake(dataMutex, portMAX_DELAY)) {
-
+    if (xSemaphoreTake(dataMutex, pdMS_TO_TICKS(100))) { // No esperar indefinidamente
         _wifiList = wifiNetworksList;
-
         _bleList = bluetoothDevicesList;
-
         _pubIP = publicIP;
-
         _locIP = localIP;
-
-        _gw = WiFi.gatewayIP().toString();
-
-        _mask = WiFi.subnetMask().toString();
-
-        _rssi = String(WiFi.RSSI());
-
-        _mac = WiFi.macAddress();
-
         _wScanTime = lastWifiScanTime;
-
         _bScanTime = lastBluetoothScanTime;
-
         _spdTime = lastSpeedTestTime;
-
         _spdVal = downloadSpeed;
-
         xSemaphoreGive(dataMutex);
-
+    } else {
+        // Si el mutex está ocupado (ej: escaneando), mostrar aviso o datos viejos si se guardan
+        _wifiList = "<p><i>Actualizando datos... por favor espere.</i></p>";
+        _bleList = "<p><i>Actualizando datos... por favor espere.</i></p>";
     }
 
-
+    // Datos estáticos o que no requieren Mutex (se obtienen fuera del bloqueo)
+    String _gw = WiFi.gatewayIP().toString();
+    String _mask = WiFi.subnetMask().toString();
+    String _rssi = String(WiFi.RSSI());
+    String _mac = WiFi.macAddress();
+    String _uptime = "";
 
     unsigned long totalSeconds = millis() / 1000;
-
     unsigned long days = totalSeconds / 86400;
-
     unsigned long hours = (totalSeconds % 86400) / 3600;
-
     unsigned long minutes = ((totalSeconds % 86400) % 3600) / 60;
-
     unsigned long seconds = ((totalSeconds % 86400) % 3600) % 60;
 
-    _uptime = "";
-
     if (days > 0) _uptime += String(days) + "d ";
-
     if (hours > 0 || days > 0) _uptime += String(hours) + "h ";
-
     if (minutes > 0 || hours > 0 || days > 0) _uptime += String(minutes) + "m ";
-
     _uptime += String(seconds) + "s";
-
     if (_uptime == "") _uptime = "0s";
 
+    server.setContentLength(CONTENT_LENGTH_UNKNOWN);
+    server.send(200, "text/html", "");
 
+    // Enviar cabecera estática desde Flash (PROGMEM)
+    server.sendContent_P(INDEX_HTML_HEAD);
 
-        server.setContentLength(CONTENT_LENGTH_UNKNOWN);
-
-
-
-        server.send(200, "text/html", "");
-
-
-
+    String chunk;
+    chunk.reserve(2048); 
     
-
-
-
-        // Enviar cabecera estática desde Flash (PROGMEM)
-
-
-
-        server.sendContent_P(INDEX_HTML_HEAD);
-
-
-
-    
-
-
-
-        String chunk;
-
-
-
-        chunk.reserve(2048); // Pre-reservar memoria para evitar fragmentación
-
-
-
-        
-
-
-
-        // --- Slide 1: Estado del Dispositivo ---
-
-
-
-        chunk = "<div class='carousel-slide fade'><h2>Estado - " + config_desc + "</h2><div class='emoji-container'><span class='emoji'>📟</span></div><br>";
-
-
-
-        chunk += "<h3><strong>📅 Fecha:</strong> " + getFormattedDate() + "<br>";
-
-
-
-        chunk += "<strong>⌚ Hora:</strong> <span id='current-time'>" + getFormattedTime() + "</span><br>";
-
-
-
-        chunk += "<strong>🖥️ Hostname:</strong> " + id_Esp + "<br>";
-
-
-
-        chunk += "<strong>🏠 IP Privada:</strong> " + _locIP + "<br>";
-
-
-
-        chunk += "<strong>↔️ M&aacute;scara:</strong> " + _mask + "<br>";
-
-
-
-        chunk += "<strong>🚪 Gateway:</strong> " + _gw + "<br>";
-
-
-
-        chunk += "<strong>🌐 IP P&uacute;blica:</strong> " + _pubIP + "<br>";
-
-
-
-        chunk += "<strong>📶 WiFi RSSI:</strong> " + _rssi + " dBm<br>";
-
-
-
-        chunk += "<strong>🆔 MAC:</strong> " + _mac + "<br>";
-
-
-
-        chunk += "<strong>💡 Chip ID:</strong> " + getUniqueId() + "<br>";
-
-
-
-        chunk += "<strong>💾 Flash:</strong> " + String(ESP.getFlashChipSize() / 1024) + " KB<br>";
-
-
-
-        chunk += "<strong>🧠 Free Heap:</strong> " + String(ESP.getFreeHeap() / 1024.0, 2) + " KB<br>";
-
-
-
-        chunk += "<strong>⚡ Uptime:</strong> " + _uptime + "</h3></div>";
-
-
-
-        server.sendContent(chunk);
+    // --- Slide 1: Estado del Dispositivo ---
+    chunk = "<div class='carousel-slide fade'><h2>Estado - " + config_desc + "</h2><div class='emoji-container'><span class='emoji'>📟</span></div><br>";
+    chunk += "<h3><strong>📅 Fecha:</strong> " + getFormattedDate() + "<br>";
+    chunk += "<strong>⌚ Hora:</strong> <span id='current-time'>" + getFormattedTime() + "</span><br>";
+    chunk += "<strong>🖥️ Hostname:</strong> " + id_Esp + "<br>";
+    chunk += "<strong>🏠 IP Privada:</strong> " + _locIP + "<br>";
+    chunk += "<strong>↔️ M&aacute;scara:</strong> " + _mask + "<br>";
+    chunk += "<strong>🚪 Gateway:</strong> " + _gw + "<br>";
+    chunk += "<strong>🌐 IP P&uacute;blica:</strong> " + _pubIP + "<br>";
+    chunk += "<strong>📶 WiFi RSSI:</strong> " + _rssi + " dBm<br>";
+    chunk += "<strong>🆔 MAC:</strong> " + _mac + "<br>";
+    chunk += "<strong>💡 Chip ID:</strong> " + getUniqueId() + "<br>";
+    chunk += "<strong>💾 Flash:</strong> " + String(ESP.getFlashChipSize() / 1024) + " KB<br>";
+    chunk += "<strong>🧠 Free Heap:</strong> " + String(ESP.getFreeHeap() / 1024.0, 2) + " KB<br>";
+    chunk += "<strong>⚡ Uptime:</strong> " + _uptime + "</h3></div>";
+    server.sendContent(chunk);
 
 
 
@@ -622,6 +533,7 @@ void setup() {
       ESP.restart();
     }
     Serial.println("[OK] WiFi Conectado correctamente.");
+    localIP = WiFi.localIP().toString();
 
     configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
     Serial.print("[INFO] Sincronizando hora NTP");

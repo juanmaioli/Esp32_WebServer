@@ -23,6 +23,9 @@ Preferences preferences;
 SemaphoreHandle_t dataMutex; // Mutex para proteger datos compartidos
 TaskHandle_t networkTaskHandle; // Handle para la tarea de fondo
 
+volatile bool requestWifiScan = false;
+volatile bool requestBleScan = false;
+
 String config_desc = "Casa";
 String config_domain = "ifconfig.me";
 
@@ -106,9 +109,17 @@ String getFormattedDate() {
 }
 
 String leftRepCadena(String mac) {
-  mac.replace(":", "");
-  mac = mac.substring(mac.length() - 4);
-  return mac;
+  String cleanMac = "";
+  for (int i = 0; i < mac.length(); i++) {
+    if (isAlphaNumeric(mac[i])) {
+      cleanMac += mac[i];
+    }
+  }
+  if (cleanMac.length() >= 4) {
+    return cleanMac.substring(cleanMac.length() - 4);
+  } else {
+    return "XXXX"; // Valor de respaldo
+  }
 }
 
 String getUniqueId() {
@@ -232,18 +243,15 @@ void networkTask(void * parameter) {
   for (;;) {
     unsigned long currentMillis = millis();
     
-    // Verificar si toca actualizar (usamos lógica bloqueante segura aquí porque estamos en otro hilo)
+    // --- 1. Tareas Periódicas (Solo IP) ---
     if (currentMillis - previousIpUpdate >= ipInterval || previousIpUpdate == 0) {
-      Serial.println("[" + getFormattedTime() + "] [BG-TASK] Iniciando escaneos en segundo plano...");
+      Serial.println("[" + getFormattedTime() + "] [BG-TASK] Actualizando IP...");
       
-      // 1. Obtener Datos (Operaciones Lentas) - Variables Locales
       String tempLocalIP = WiFi.localIP().toString();
-      
-      // Get Public IP Logic (Inline para evitar usar variables globales sin mutex)
       String tempPublicIP = "Error";
       WiFiClientSecure client;
       client.setInsecure();
-      const char* host = config_domain.c_str(); // config_domain es segura de leer aqui raramente cambia
+      const char* host = config_domain.c_str(); 
       if (client.connect(host, 443)) {
         client.print(String("GET /ip HTTP/1.1\r\n") + "Host: " + host + "\r\n" + "User-Agent: ESP32-IP-Checker\r\n" + "Connection: close\r\n\r\n");
         if (client.find("\r\n\r\n")) {
@@ -253,31 +261,46 @@ void networkTask(void * parameter) {
         }
       }
 
-      // 2. Escaneo WiFi
-      String tempWifiList = scanWifiNetworks();
-      String tempWifiTime = getFormattedTime();
-
-      // 3. Escaneo Bluetooth
-      String tempBleList = scanBluetoothDevices();
-      String tempBleTime = getFormattedTime();
-
-      // 4. Actualizar Globales (Sección Crítica - Rápida)
       if (xSemaphoreTake(dataMutex, portMAX_DELAY)) {
         localIP = tempLocalIP;
         publicIP = tempPublicIP;
-        wifiNetworksList = tempWifiList;
-        lastWifiScanTime = tempWifiTime;
-        bluetoothDevicesList = tempBleList;
-        lastBluetoothScanTime = tempBleTime;
-        previousIpUpdate = currentMillis; // Actualizar timer
+        previousIpUpdate = currentMillis;
         xSemaphoreGive(dataMutex);
       }
-      
-      Serial.println("[" + getFormattedTime() + "] [BG-TASK] Datos actualizados. Durmiendo...");
     }
 
-    // Delay para permitir que el IDLE task resetee el Watchdog y no saturar la CPU
-    vTaskDelay(pdMS_TO_TICKS(1000)); 
+    // --- 2. Escaneo WiFi Manual ---
+    if (requestWifiScan) {
+      Serial.println("[" + getFormattedTime() + "] [BG-TASK] Ejecutando Escaneo WiFi Manual...");
+      String tempWifiList = scanWifiNetworks();
+      String tempWifiTime = getFormattedTime();
+      
+      if (xSemaphoreTake(dataMutex, portMAX_DELAY)) {
+        wifiNetworksList = tempWifiList;
+        lastWifiScanTime = tempWifiTime;
+        xSemaphoreGive(dataMutex);
+      }
+      requestWifiScan = false; // Reset flag
+      Serial.println("[" + getFormattedTime() + "] [BG-TASK] Escaneo WiFi Completado.");
+    }
+
+    // --- 3. Escaneo Bluetooth Manual ---
+    if (requestBleScan) {
+      Serial.println("[" + getFormattedTime() + "] [BG-TASK] Ejecutando Escaneo Bluetooth Manual...");
+      String tempBleList = scanBluetoothDevices();
+      String tempBleTime = getFormattedTime();
+      
+      if (xSemaphoreTake(dataMutex, portMAX_DELAY)) {
+        bluetoothDevicesList = tempBleList;
+        lastBluetoothScanTime = tempBleTime;
+        xSemaphoreGive(dataMutex);
+      }
+      requestBleScan = false; // Reset flag
+      Serial.println("[" + getFormattedTime() + "] [BG-TASK] Escaneo Bluetooth Completado.");
+    }
+
+    // Delay corto para respuesta rápida a botones
+    vTaskDelay(pdMS_TO_TICKS(200)); 
   }
 }
 
@@ -304,6 +327,26 @@ void handleSaveConfig() {
     }
   }
 
+  server.sendHeader("Location", String("/"), true);
+  server.send(302, "text/plain", "");
+}
+
+void handleScanWifi() {
+  requestWifiScan = true;
+  unsigned long start = millis();
+  while (requestWifiScan && millis() - start < 10000) {
+    delay(100); // Esperar a que la tarea BG termine
+  }
+  server.sendHeader("Location", String("/"), true);
+  server.send(302, "text/plain", "");
+}
+
+void handleScanBle() {
+  requestBleScan = true;
+  unsigned long start = millis();
+  while (requestBleScan && millis() - start < 10000) {
+    delay(100); // Esperar a que la tarea BG termine
+  }
   server.sendHeader("Location", String("/"), true);
   server.send(302, "text/plain", "");
 }
@@ -474,19 +517,31 @@ void handleRoot() {
 
 
 
-    // --- Slide 2: Redes WiFi Cercanas ---
-
-    chunk = "<div class='carousel-slide fade'><h2>Redes WiFi Cercanas</h2><div class='emoji-container'><span class='emoji'>📡</span></div><br><p><strong>Escaneado:</strong> " + _wScanTime + "</p>" + _wifiList + "</div>";
-
-    server.sendContent(chunk);
+        // --- Slide 2: Redes WiFi Cercanas ---
 
 
 
-    // --- Slide 3: Bluetooth (BLE) ---
+        chunk = "<div class='carousel-slide fade'><h2>Redes WiFi Cercanas</h2><div class='emoji-container'><span class='emoji'>📡</span></div><br><p><strong>Escaneado:</strong> " + _wScanTime + "</p><div class='center-button'><a href='/scanwifi' id='scanwifi-button' class='button' onclick='showWaiting(\"scanwifi-button\", \"waiting-wifi\")'>🔄 Escanear Ahora</a></div><p id='waiting-wifi' style='display:none; text-align:center;'>Buscando redes...</p>" + _wifiList + "</div>";
 
-    chunk = "<div class='carousel-slide fade'><h2>Bluetooth (BLE)</h2><div class='emoji-container'><span class='emoji'>🦷</span></div><br><p><strong>Escaneado:</strong> " + _bScanTime + "</p>" + _bleList + "</div>";
 
-    server.sendContent(chunk);
+
+        server.sendContent(chunk);
+
+
+
+    
+
+
+
+        // --- Slide 3: Bluetooth (BLE) ---
+
+
+
+        chunk = "<div class='carousel-slide fade'><h2>Bluetooth (BLE)</h2><div class='emoji-container'><span class='emoji'>🦷</span></div><br><p><strong>Escaneado:</strong> " + _bScanTime + "</p><div class='center-button'><a href='/scanble' id='scanble-button' class='button' onclick='showWaiting(\"scanble-button\", \"waiting-ble\")'>🔄 Escanear Ahora</a></div><p id='waiting-ble' style='display:none; text-align:center;'>Buscando dispositivos...</p>" + _bleList + "</div>";
+
+
+
+        server.sendContent(chunk);
 
 
 
@@ -543,7 +598,16 @@ void setup() {
     pBLEScan->setInterval(100);
     pBLEScan->setWindow(99);
 
+    WiFi.mode(WIFI_STA); 
+    delay(100); // Pequeña espera para inicializar hardware
     serial_number = WiFi.macAddress();
+    
+    // Si la MAC es nula o solo ceros, usar el Chip ID único del hardware
+    if (serial_number == "" || serial_number == "00:00:00:00:00:00") {
+      serial_number = getUniqueId();
+    }
+    
+    Serial.println("[INFO] MAC para Hostname: " + serial_number);
     id_Esp = String(hostname_prefix) + leftRepCadena(serial_number);
     WiFi.setHostname(id_Esp.c_str());
 
@@ -572,12 +636,14 @@ void setup() {
 
     // Iniciar Tarea de Segundo Plano (Core 0)
     // Stack de 4KB (4096), prioridad 1
-    xTaskCreatePinnedToCore(networkTask, "NetworkTask", 4096, NULL, 1, &networkTaskHandle, 0);
+    xTaskCreatePinnedToCore(networkTask, "NetworkTask", 8192, NULL, 1, &networkTaskHandle, 0);
 
     // Initial update is handled by the task immediately
 
     server.on("/", handleRoot);
     server.on("/speedtest", handleSpeedTest);
+    server.on("/scanwifi", handleScanWifi);
+    server.on("/scanble", handleScanBle);
     server.on("/time", handleTimeRequest);
     server.on("/save", HTTP_POST, handleSaveConfig);
     server.begin();

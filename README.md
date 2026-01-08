@@ -1,14 +1,17 @@
-# 📡 ESP32 WebServer Monitor
+# 📡 ESP32 WebServer Monitor (FreeRTOS Dual-Core)
 
 **Autor:** Juan Maioli  
-**Versión:** 1.9 (Configuración Persistente + Estilo Mejorado)
+**Versión:** 2.0 (Multitarea Real + Configuración Persistente)
 
-Este proyecto es un monitor de sistema y red avanzado para el microcontrolador **ESP32**. Genera un servidor web local con una interfaz tipo carrusel que muestra estadísticas vitales, escaneo de redes y utilidades en tiempo real, ahora con capacidad de configuración persistente.
+Este proyecto es un monitor de sistema y red avanzado para el microcontrolador **ESP32**. Genera un servidor web local con una interfaz fluida tipo carrusel que muestra estadísticas vitales, escaneo de redes y utilidades en tiempo real.
+
+> **🚀 Novedad v2.0:** Utiliza **FreeRTOS** para ejecutar escaneos de WiFi y Bluetooth en un núcleo secundario (Core 0), manteniendo el servidor web siempre receptivo en el núcleo principal (Core 1). ¡Cero bloqueos!
 
 ## ✨ Características Principales
 
-*   **🖥️ Dashboard Web Interactivo:** Accesible vía navegador (Puerto 3000), con navegación manual y diseño responsivo mejorado (Dark Mode nativo).
-*   **⚙️ Configuración Persistente:** Edita la descripción del dispositivo y el proveedor de IP pública directamente desde la web (guardado en Flash/NVS).
+*   **🖥️ Dashboard Web Fluido:** Accesible vía navegador (Puerto 3000), con navegación manual y diseño responsivo (Dark Mode).
+*   **⚡ Arquitectura Dual-Core:** Las tareas pesadas (escaneos) corren en segundo plano sin congelar la interfaz web.
+*   **⚙️ Configuración Persistente:** Edita la descripción del dispositivo y el proveedor de IP pública desde la web (guardado en Flash/NVS).
 *   **📶 Escáner WiFi:** Detecta redes cercanas, mostrando SSID, intensidad (RSSI) y seguridad.
 *   **🦷 Escáner Bluetooth (BLE):** Busca dispositivos Bluetooth Low Energy cercanos.
 *   **🚀 Speedtest Integrado:** Prueba de velocidad de descarga real.
@@ -18,18 +21,17 @@ Este proyecto es un monitor de sistema y red avanzado para el microcontrolador *
 
 ## 🛠️ Requisitos de Hardware
 
-*   **Placa:** ESP32 (Probado en ESP32-S3, compatible con WROOM/WROVER).
+*   **Placa:** ESP32 Dual Core (ESP32-WROOM, ESP32-S3, etc.).
 *   **Flash:** Recomendado 4MB o superior (Configuración óptima: 8MB).
 
 ## ⚙️ Configuración del Entorno (Arduino IDE)
 
-Para compilar este proyecto, es **CRÍTICO** ajustar el esquema de partición debido al tamaño de las librerías de Bluetooth.
+Para compilar este proyecto, es **CRÍTICO** ajustar el esquema de partición debido al tamaño de las librerías de Bluetooth y FreeRTOS.
 
 1.  **Gestor de Tarjetas:** Asegúrate de tener instalado el core `esp32` de Espressif.
 2.  **Librerías Requeridas:**
     *   `WiFiManager` (por tzapu/tablatronix).
-    *   `ESP32 BLE Arduino` (Incluida en el core normalmente).
-    *   `Preferences` (Nativa del core ESP32).
+    *   `ESP32 BLE Arduino`, `Preferences`, `FreeRTOS` (Nativas del core ESP32).
     *   `HTTPClient`, `WiFiClientSecure`, `WebServer`.
 
 ### ⚠️ Parámetros de Compilación (Importante)
@@ -65,7 +67,8 @@ Configura tu IDE con estos valores para evitar errores de memoria:
 ## 🐛 Debugging
 
 El sistema envía mensajes de diagnóstico al puerto serie (115200 baudios):
-*   `[INFO]`: Eventos normales (conexión, escaneos).
+*   `[INFO]`: Eventos normales.
+*   `[BG-TASK]`: Eventos de la tarea de segundo plano (Core 0).
 *   `[OK]`: Operaciones exitosas.
 *   `[CRITICO]`: Errores graves o reinicios.
 

@@ -1,17 +1,17 @@
 # 📡 ESP32 WebServer Monitor
 
 **Autor:** Juan Maioli  
-**Versión:** 1.7 (Migrado a ESP32)
+**Versión:** 1.8 (Migrado a ESP32 + Bluetooth Scan)
 
-Este proyecto es un monitor de sistema y red avanzado para el microcontrolador **ESP32**. Genera un servidor web local con una interfaz tipo carrusel que muestra estadísticas vitales, escaneo de redes y datos externos en tiempo real.
+Este proyecto es un monitor de sistema y red avanzado para el microcontrolador **ESP32**. Genera un servidor web local con una interfaz tipo carrusel que muestra estadísticas vitales, escaneo de redes y utilidades en tiempo real.
 
 ## ✨ Características Principales
 
-*   **🖥️ Dashboard Web Interactivo:** Accesible vía navegador (Puerto 3000), con rotación automática de diapositivas.
+*   **🖥️ Dashboard Web Interactivo:** Accesible vía navegador (Puerto 3000), con navegación manual táctil o por botones.
 *   **📶 Escáner WiFi:** Detecta redes cercanas, mostrando SSID, intensidad (RSSI) y seguridad.
-*   **🦷 Escáner Bluetooth (BLE):** (Nuevo) Busca dispositivos Bluetooth Low Energy cercanos.
+*   **🦷 Escáner Bluetooth (BLE):** Busca dispositivos Bluetooth Low Energy cercanos.
 *   **🚀 Speedtest Integrado:** Prueba de velocidad de descarga real (descarga archivo de 5MB).
-*   **☁️ Datos Externos:** Obtiene IP Pública y datos personalizados desde servidor remoto (`pikapp.com.ar`).
+*   **🌐 Datos de Red:** Obtiene IP Pública, IP local, Gateway y Máscara de subred.
 *   **🕒 Sincronización NTP:** Hora y fecha automáticas (Zona horaria Argentina GMT-3).
 *   **🔌 Portal Cautivo (WiFiManager):** Si no encuentra red, crea un punto de acceso para configuración fácil sin tocar código.
 
@@ -58,10 +58,9 @@ Configura tu IDE con estos valores para evitar errores de memoria:
 ## 📊 Estructura del Carrusel Web
 
 1.  **Estado:** Info del sistema (Uptime, RAM, Flash, IP, MAC).
-2.  **Clima/Info:** Datos remotos del Clima.
-3.  **WiFi:** Lista de redes ordenadas por señal.
-4.  **Bluetooth:** Lista de dispositivos BLE detectados.
-5.  **Speedtest:** Botón para iniciar prueba de velocidad.
+2.  **WiFi:** Lista de redes ordenadas por señal.
+3.  **Bluetooth:** Lista de dispositivos BLE detectados.
+4.  **Speedtest:** Botón para iniciar prueba de velocidad.
 
 ## 🐛 Debugging
 

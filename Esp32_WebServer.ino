@@ -24,7 +24,6 @@ String serial_number;
 String id_Esp;
 String localIP;
 String publicIP = "Obteniendo...";
-String weatherData = "Cargando...";
 String wifiNetworksList = "Escaneando...";
 String bluetoothDevicesList = "Escaneando..."; // Nueva variable para BT
 String lastWifiScanTime = "Nunca";
@@ -194,18 +193,6 @@ void updateNetworkData() {
   localIP = WiFi.localIP().toString();
   getPublicIP();
   
-  HTTPClient http;
-  WiFiClient client;
-  if (http.begin(client, "http://172.21.5.3/ApiWheather/txt/")) {
-    int httpCode = http.GET();
-    if (httpCode > 0 && httpCode == HTTP_CODE_OK) {
-      cavaData = http.getString();
-    } else {
-      weatherData = "Error Clima: " + String(httpCode);
-    }
-    http.end();
-  }
-  
   // 2. Escaneo WiFi
   Serial.println("[" + getFormattedTime() + "] [INFO] Escaneando WiFi...");
   wifiNetworksList = scanWifiNetworks();
@@ -221,7 +208,6 @@ void updateNetworkData() {
 
 // --- Handler para el Servidor Web ---
 void handleRoot() {
-    String formattedWeatherData = weatherData;
     unsigned long totalSeconds = millis() / 1000;
     unsigned long days = totalSeconds / 86400;
     unsigned long hours = (totalSeconds % 86400) / 3600;
@@ -297,12 +283,6 @@ void handleRoot() {
     page += "<strong>⚡ Uptime:</strong> " + uptime + "</h3>";
     page += "</div>";
 
-    // --- Slide 2: Datos del Clima ---
-    page += "<div class='carousel-slide fade'>";
-    page += "<h2>Datos del Clima</h2>";
-    page += "<div><p>" + formattedWeatherData + "</p></div>";
-    page += "</div>";
-
     // --- Slide 3: Redes WiFi Cercanas ---
     page += "<div class='carousel-slide fade'>";
     page += "<h2>Redes WiFi Cercanas</h2>";
@@ -339,7 +319,6 @@ void handleRoot() {
     page += "<span class='dot' onclick='currentSlide(2)'></span>";
     page += "<span class='dot' onclick='currentSlide(3)'></span>";
     page += "<span class='dot' onclick='currentSlide(4)'></span>";
-    page += "<span class='dot' onclick='currentSlide(5)'></span>"; // 5to punto
     page += "</div>";
 
     page += "</div>"; // end container
@@ -365,7 +344,6 @@ void handleRoot() {
     page += "slides[slideIndex - 1].style.display = 'block';";
     page += "dots[slideIndex - 1].className += ' active';";
     page += "}";
-    page += "setInterval(function() { changeSlide(1); }, 30000);"; 
     page += "function updateTime() { fetch('/time').then(response => response.text()).then(data => { if (data) document.getElementById('current-time').innerText = data; }); } setInterval(updateTime, 900000);";
     page += "</script>";
     
